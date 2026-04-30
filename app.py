@@ -115,7 +115,7 @@ def get_existing(df, date_str, col, default):
 
 # ── ページ：デイリー記録 ───────────────────────────
 def page_daily(worksheet):
-    st.title("🌟 LAS リハビリ＆リズムウェルネス")
+    st.title("🌟 LAS リハ＆リズムウェルネス")
     st.caption("毎日の積み重ねが、最大の力になる。")
 
     df = load_data(worksheet)
@@ -376,20 +376,43 @@ def page_diary(client):
                 st.write(r.get("body", ""))
 
 # ── ページ：スケジュール ───────────────────────────
-def page_schedule():
+def page_schedule(client):
     st.title("🗓️ 週間スケジュール")
+
+    # 日記シートから予定を読み込む
+    ws = get_diary_sheet(client)
+    diary_df = load_diary(ws) if ws is not None else pd.DataFrame(columns=DIARY_COLUMNS)
 
     today = date.today()
     weekday_jp = ["月", "火", "水", "木", "金", "土", "日"]
     today_jp = weekday_jp[today.weekday()]
 
+    # 今週の月曜日を起点に7日分の日付を計算
+    monday = today - timedelta(days=today.weekday())
+    week_dates = [monday + timedelta(days=i) for i in range(7)]
+
     st.subheader("📅 今週の予定")
-    for day, activities in WEEKLY_SCHEDULE.items():
+    for i, (day, activities) in enumerate(WEEKLY_SCHEDULE.items()):
         is_today = (day == today_jp)
-        label = f"{'👉 ' if is_today else ''}{day}曜日{'（今日）' if is_today else ''}"
+        target_date = week_dates[i]
+        date_str = str(target_date)
+
+        # 日記シートからその日の予定を取得
+        diary_schedule = get_existing(diary_df, date_str, "schedule_line", "")
+
+        label = f"{'👉 ' if is_today else ''}{day}曜日　{target_date.strftime('%m/%d')}{'（今日）' if is_today else ''}"
         with st.expander(label, expanded=is_today):
+            # 習い事などの固定スケジュール
+            st.caption("📌 固定スケジュール")
             for act in activities:
                 st.write(f"・{act}")
+            # 日記から取得した予定
+            if diary_schedule:
+                st.caption("🗒️ この日の予定（日記より）")
+                st.write(diary_schedule)
+            else:
+                st.caption("🗒️ この日の予定（日記より）")
+                st.write("－ 未入力")
 
     st.divider()
     st.subheader("🎵 今月のメトロノーム目標")
@@ -428,7 +451,7 @@ def main():
     elif page == "📔 日記":
         page_diary(client)
     elif page == "🗓️ スケジュール":
-        page_schedule()
+        page_schedule(client)   # ← clientを追加
 
 if __name__ == "__main__":
     main()
