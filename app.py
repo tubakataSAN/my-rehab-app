@@ -262,14 +262,58 @@ def page_graph(worksheet):
         st.info("選択した期間のデータがありません。")
         return
 
-    # 体重グラフ
-    st.subheader("⚖️ 体重推移")
-    if not df_view["weight_kg"].isna().all():
-        start_weight = df_view["weight_kg"].iloc[0]
-        chart_df = df_view[["date", "weight_kg"]].copy()
-        chart_df["目標ライン"] = start_weight - 1.5
-        st.line_chart(chart_df.set_index("date")[["weight_kg", "目標ライン"]])
-        st.caption(f"目標：{start_weight - 1.5:.1f}kg（月-1.5kg）")
+# 体重グラフ
+st.subheader("⚖️ 体重推移")
+if not df_view["weight_kg"].isna().all():
+    import plotly.graph_objects as go
+
+    # 直近15日分の日付軸を作成（最新日が右端から2番目）
+    latest_date = df_view["date"].max()
+    x_end   = latest_date + pd.Timedelta(days=1)   # 右端（空白1日分）
+    x_start = x_end - pd.Timedelta(days=14)        # 15日分
+
+    # 目標ライン（最初の体重 - 1.5kg）
+    start_weight  = df_view["weight_kg"].iloc[0]
+    target_weight = start_weight - 1.5
+
+    fig = go.Figure()
+
+    # 実績ライン
+    fig.add_trace(go.Scatter(
+        x=df_view["date"],
+        y=df_view["weight_kg"],
+        mode="lines+markers",
+        name="体重",
+        line=dict(color="#1f77b4", width=2),
+        marker=dict(size=6)
+    ))
+
+    # 目標ライン（破線）
+    fig.add_trace(go.Scatter(
+        x=[x_start, x_end],
+        y=[target_weight, target_weight],
+        mode="lines",
+        name=f"目標 {target_weight:.1f}kg",
+        line=dict(color="red", width=1, dash="dash")
+    ))
+
+    fig.update_layout(
+        xaxis=dict(
+            range=[x_start, x_end],
+            tickformat="%m/%d",
+            dtick=86400000 * 2,   # 2日おきに目盛り（ミリ秒単位）
+        ),
+        yaxis=dict(
+            range=[67, 97],
+            title="kg"
+        ),
+        legend=dict(orientation="h", y=-0.2),
+        margin=dict(l=10, r=10, t=10, b=10),
+        height=350
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+    st.caption(f"目標体重：{target_weight:.1f}kg（月-1.5kg）　縦軸：67〜97kg　横軸：直近15日")
 
     # 歩行日数グラフ
     st.subheader("🚶 週別歩行日数")
