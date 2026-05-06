@@ -50,54 +50,35 @@ def apply_style():
 # ── ページ選択ボタン ───────────────────────────────
 def page_selector():
     pages = ["📋 記録", "📊 グラフ", "📔 日記", "🗓️ 予定", "⚙️ 管理"]
+
     if "page" not in st.session_state:
         st.session_state.page = "📋 記録"
 
-    # ボタンのHTML/CSSで強制横並び
+    # columnsが縦にならないようCSSで強制横並び
     st.markdown("""
-    <style>
-    .nav-container {
-        display: flex;
-        flex-direction: row;
-        gap: 4px;
-        width: 100%;
-        margin-bottom: 8px;
-    }
-    .nav-btn {
-        flex: 1;
-        padding: 8px 2px;
-        font-size: 0.7rem;
-        text-align: center;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-        background-color: #f0f0f0;
-        cursor: pointer;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .nav-btn.active {
-        background-color: #ff4b4b;
-        color: white;
-        border-color: #ff4b4b;
-        font-weight: bold;
-    }
-    </style>
+        <style>
+        /* カラムを常に横並びに固定 */
+        [data-testid="column"] {
+            min-width: 0 !important;
+            flex: 1 1 0 !important;
+            padding: 0 2px !important;
+        }
+        /* ボタンを小さく */
+        [data-testid="column"] button {
+            padding: 0.4rem 0.1rem !important;
+            font-size: 1.2rem !important;
+            min-height: 2.5rem !important;
+        }
+        </style>
     """, unsafe_allow_html=True)
 
-    # 現在のページをクエリパラメータで管理
-    query = st.query_params
-    if "page" in query:
-        st.session_state.page = query["page"]
-
-    # ボタンをStreamlitで横並び（columns固定幅）
     cols = st.columns(5)
     for i, p in enumerate(pages):
+        icon = p.split(" ")[0]
         is_active = (st.session_state.page == p)
         with cols[i]:
-            label = p.split(" ")[0]  # 絵文字だけ表示（スマホ省スペース）
             if st.button(
-                label,
+                icon,
                 key=f"nav_{i}",
                 use_container_width=True,
                 type="primary" if is_active else "secondary"
@@ -105,7 +86,6 @@ def page_selector():
                 st.session_state.page = p
                 st.rerun()
 
-    # 現在のページ名を表示
     st.caption(f"現在のページ：{st.session_state.page}")
     st.divider()
     return st.session_state.page
