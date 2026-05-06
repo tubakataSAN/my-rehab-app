@@ -4,6 +4,7 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 
 # ── 定数 ──────────────────────────────────────────
 SHEET_NAME   = "LAS_Rehab_Log"
@@ -31,6 +32,11 @@ WEEKLY_SCHEDULE = {
     "日": ["ボランティア", "自由"],
 }
 
+def today_jst() -> date:
+    """日本時間の今日の日付を返す"""
+    from datetime import datetime
+    return datetime.now(ZoneInfo("Asia/Tokyo")).date()
+
 # ── スタイル ───────────────────────────────────────
 def apply_style():
     st.markdown("""
@@ -46,12 +52,61 @@ def page_selector():
     pages = ["📋 記録", "📊 グラフ", "📔 日記", "🗓️ 予定", "⚙️ 管理"]
     if "page" not in st.session_state:
         st.session_state.page = "📋 記録"
-    cols = st.columns(len(pages))
+
+    # ボタンのHTML/CSSで強制横並び
+    st.markdown("""
+    <style>
+    .nav-container {
+        display: flex;
+        flex-direction: row;
+        gap: 4px;
+        width: 100%;
+        margin-bottom: 8px;
+    }
+    .nav-btn {
+        flex: 1;
+        padding: 8px 2px;
+        font-size: 0.7rem;
+        text-align: center;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        background-color: #f0f0f0;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .nav-btn.active {
+        background-color: #ff4b4b;
+        color: white;
+        border-color: #ff4b4b;
+        font-weight: bold;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # 現在のページをクエリパラメータで管理
+    query = st.query_params
+    if "page" in query:
+        st.session_state.page = query["page"]
+
+    # ボタンをStreamlitで横並び（columns固定幅）
+    cols = st.columns(5)
     for i, p in enumerate(pages):
-        if cols[i].button(p, use_container_width=True,
-                          type="primary" if st.session_state.page == p else "secondary"):
-            st.session_state.page = p
-            st.rerun()
+        is_active = (st.session_state.page == p)
+        with cols[i]:
+            label = p.split(" ")[0]  # 絵文字だけ表示（スマホ省スペース）
+            if st.button(
+                label,
+                key=f"nav_{i}",
+                use_container_width=True,
+                type="primary" if is_active else "secondary"
+            ):
+                st.session_state.page = p
+                st.rerun()
+
+    # 現在のページ名を表示
+    st.caption(f"現在のページ：{st.session_state.page}")
     st.divider()
     return st.session_state.page
 
@@ -160,7 +215,7 @@ def page_daily(ws):
     st.caption("毎日の積み重ねが、最大の力になる。")
 
     df = load_data(ws)
-    today = date.today()
+    today =  today_jst()
     input_date = st.date_input("📅 記録日", value=today)
     date_str = str(input_date)
 
@@ -327,7 +382,7 @@ def page_graph(ws):
     df = df.sort_values("date")
 
     period = st.selectbox("表示期間", ["今月", "過去30日", "全期間"])
-    today  = pd.Timestamp(date.today())
+    today  = pd.Timestamp( today_jst())
     if period == "今月":
         df_view = df[df["date"].dt.month == today.month]
     elif period == "過去30日":
@@ -404,7 +459,7 @@ def page_diary(client):
         return
 
     df    = load_diary(ws)
-    today = date.today()
+    today =  today_jst()
     input_date = st.date_input("📅 日付", value=today)
     date_str   = str(input_date)
 
@@ -463,7 +518,7 @@ def page_schedule(client):
     diary_df = (load_diary(ws) if ws is not None
                 else pd.DataFrame(columns=DIARY_COLUMNS))
 
-    today      = date.today()
+    today      =  today_jst()
     weekday_jp = ["月","火","水","木","金","土","日"]
     today_jp   = weekday_jp[today.weekday()]
     monday     = today - timedelta(days=today.weekday())
@@ -515,7 +570,7 @@ def page_admin(client):
             st.download_button(
                 label="⬇️ デイリー記録をCSV保存",
                 data=df.to_csv(index=False).encode("utf-8-sig"),
-                file_name=f"rehab_backup_{date.today()}.csv",
+                file_name=f"rehab_backup_{ today_jst()}.csv",
                 mime="text/csv",
                 use_container_width=True
             )
@@ -524,7 +579,7 @@ def page_admin(client):
             st.download_button(
                 label="⬇️ 日記をCSV保存",
                 data=diary_df.to_csv(index=False).encode("utf-8-sig"),
-                file_name=f"diary_backup_{date.today()}.csv",
+                file_name=f"diary_backup_{ today_jst()}.csv",
                 mime="text/csv",
                 use_container_width=True
             )
@@ -536,7 +591,7 @@ def page_admin(client):
     st.caption("誤入力を修正したいときは削除してから再入力してください。")
     st.warning("⚠️ 削除すると元に戻せません。先にバックアップを取ることをおすすめします。")
 
-    clear_date = st.date_input("削除する日付", value=date.today())
+    clear_date = st.date_input("削除する日付", value= today_jst())
     clear_str  = str(clear_date)
 
     c1, c2 = st.columns(2)
